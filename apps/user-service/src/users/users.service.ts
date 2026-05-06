@@ -45,6 +45,7 @@ export class UsersService {
         const cacheKey = `user:${id}`;
         const cachedUser = await this.redisClient.get<Users>(cacheKey);
         if(cachedUser){ 
+            console.log('cached order - findUserById');
             return cachedUser;
         };
         const user = await this.model.findById(id);

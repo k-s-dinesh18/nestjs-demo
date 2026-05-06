@@ -1,11 +1,11 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { RabbitmqModule } from '../rabbitmq/rabbitmq.module';
 import { ClientProxy } from '@nestjs/microservices';
 import { Orders } from './schema/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { RedisService } from '../common/redis/redis.service';
+
 
 @Injectable()
 export class OrdersService {
@@ -25,9 +25,11 @@ export class OrdersService {
     async create(dto: CreateOrderDto){
         const order = await this.model.create(dto);
 
-        await this.redisService.set(`order:${order.id}`, JSON.stringify(order), 60);
-        await this.rabbitMq.emit('order.created', order);
+        await this.redisService.set(`order:${order.id}`, order, 60);
+        // await this.rabbitMq.emit('order.created', order);
         await this.kafkaClient.emit('order.created', order);
+        
+        return order;
     }
 
     async findById(id: string){
@@ -39,6 +41,7 @@ export class OrdersService {
         const cachedKey = `order:${id}`;
         const cachedOrder = await this.redisService.get<Orders>(id);
         if(cachedOrder){
+            console.log('cached order - findById');
             return cachedOrder;
         }
 
@@ -50,6 +53,14 @@ export class OrdersService {
     }
     
     async findAll(){
-        await this.model.find();
+        const cachedKey = 'orders:all';
+        const cachedOrder = await this.redisService.get<Orders[]>(cachedKey);
+        if(cachedOrder){
+            console.log('cached orders - findAll');
+            return cachedOrder;
+        }
+        const orders = await this.model.find().lean();
+        await this.redisService.set(cachedKey, orders, 60);
+        return orders;
     }
 }
