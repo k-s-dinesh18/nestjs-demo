@@ -1,7 +1,9 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 
+export type OrderDocument = Order & Document;
+
 @Schema({timestamps: true})
-export class Orders{
+export class Order{
     @Prop({required: true})
     userId!: string;
     
@@ -15,4 +17,4 @@ export class Orders{
     status!: string;
 }
 
-export const orderSchema = SchemaFactory.createForClass(Orders);
+export const OrderSchema = SchemaFactory.createForClass(Order);

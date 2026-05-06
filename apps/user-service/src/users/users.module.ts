@@ -1,17 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
-import { Users, userSchema } from './schema/users.schema';
-import { RabbitmqModule } from 'apps/user-service/src/rabbitmq/rabbitmq.module';
+import { RabbitmqModule } from 'libs/messaging/rabbitmq/rabbitmq.module';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: Users.name, schema: userSchema },
-    ]),
-    RabbitmqModule
-  ],
+  imports: [RabbitmqModule],
   controllers: [UsersController],
   providers: [UsersService],
 })

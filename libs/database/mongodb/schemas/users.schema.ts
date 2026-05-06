@@ -5,11 +5,15 @@ export enum Roles{
     EMPLOYEE = 'employee',
     INTERN = 'intern'
 }
+
+
+export type UserDocument = User & Document;
+
 @Schema({
     timestamps: true
 })
 
-export class Users{
+export class User{
     @Prop()
     name!: string;
 
@@ -23,4 +27,4 @@ export class Users{
     role?: Roles;
 }
 
-export const userSchema = SchemaFactory.createForClass(Users);
+export const UserSchema = SchemaFactory.createForClass(User);

@@ -1,34 +1,31 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import { ClientProxy } from '@nestjs/microservices';
-import { Orders } from './schema/order.schema';
-import mongoose, { Model } from 'mongoose';
+import { Order } from '../../../../libs/database/mongodb/schemas/order.schema';
+import mongoose from 'mongoose';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { RedisService } from '../common/redis/redis.service';
+import { RedisService } from '../../../../libs/redis/redis.service';
+import { OrdersRepository } from '@database/mongodb/repositories/order.repository';
 
 
 @Injectable()
 export class OrdersService {
     constructor(
-        @Inject('RABBITMQ_SERVICE')
-        private rabbitMq: ClientProxy,
-
         @Inject('KAFKA_SERVICE')
         private kafkaClient: ClientProxy,
 
-        @InjectModel(Orders.name)
-        private model: Model<Orders>,
+        private ordersRepo: OrdersRepository,
 
         private redisService: RedisService
     ){}
 
     async create(dto: CreateOrderDto){
-        const order = await this.model.create(dto);
+        const order = await this.ordersRepo.create(dto);
 
         await this.redisService.set(`order:${order.id}`, order, 60);
-        // await this.rabbitMq.emit('order.created', order);
-        await this.kafkaClient.emit('order.created', order);
+        await this.redisService.del('orders:all');
         
+        this.kafkaClient.emit('order.created', order);
+
         return order;
     }
 
@@ -39,27 +36,31 @@ export class OrdersService {
         }
 
         const cachedKey = `order:${id}`;
-        const cachedOrder = await this.redisService.get<Orders>(id);
+        const cachedOrder = await this.redisService.get<Order>(cachedKey);
         if(cachedOrder){
             console.log('cached order - findById');
             return cachedOrder;
         }
 
-        const order = await this.model.findById(id);
+        const order = await this.ordersRepo.findById(id);
+
         if(!order){
-            throw new NotFoundException('Id not found');
+            throw new NotFoundException('Order Id not found');
         }
+
+        await this.redisService.set(cachedKey, order, 60);
         return order;
     }
     
     async findAll(){
         const cachedKey = 'orders:all';
-        const cachedOrder = await this.redisService.get<Orders[]>(cachedKey);
+        const cachedOrder = await this.redisService.get<Order[]>(cachedKey);
         if(cachedOrder){
             console.log('cached orders - findAll');
             return cachedOrder;
         }
-        const orders = await this.model.find().lean();
+        const orders = await this.ordersRepo.findAll();
+
         await this.redisService.set(cachedKey, orders, 60);
         return orders;
     }

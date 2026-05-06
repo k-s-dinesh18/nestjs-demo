@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Post, Body, Patch, Delete, Query } from '@nestjs/common';
-import { Users } from './schema/users.schema';
+import { Users } from '../../../../libs/database/mongodb/schemas/users.schema';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';

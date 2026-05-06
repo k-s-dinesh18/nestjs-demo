@@ -1,5 +1,5 @@
 import { IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
-import { Roles } from "../schema/users.schema"
+import { Roles } from "../../../../../libs/database/mongodb/schemas/users.schema"
 
 export class UpdateUserDto{
     @IsOptional()

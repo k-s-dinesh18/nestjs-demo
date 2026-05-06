@@ -1,7 +1,7 @@
   import { Module } from '@nestjs/common';
   import { AnalyticsServiceController } from './analytics-service.controller';
   import { AnalyticsServiceService } from './analytics-service.service';
-  import { KafkaModule } from 'apps/user-service/src/kafka/kafka.module';
+  import { KafkaModule } from 'libs/messaging/kafka/kafka.module';
   import { ConfigModule } from '@nestjs/config';
 
   @Module({

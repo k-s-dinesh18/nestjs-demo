@@ -1,106 +1,125 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Users } from './schema/users.schema';
+import { UserRepository } from '../../../../libs/database/mongodb/repositories/user.repository';
 import mongoose from 'mongoose';
 import { Query } from 'express-serve-static-core';
-import { RedisService } from 'apps/user-service/src/common/redis/redis.service';
+import { RedisService } from 'libs/redis/redis.service';
 import { ClientProxy } from '@nestjs/microservices';
+import { User } from '@database/mongodb/schemas/users.schema';
+
+
 @Injectable()
 export class UsersService {
-    constructor(
-        @InjectModel(Users.name)
-        private model: mongoose.Model<Users>,        
+    constructor(  
+        private readonly usersRepo: UserRepository,
         private redisClient: RedisService,
 
         @Inject('RABBITMQ_SERVICE')
         private client: ClientProxy
     ) {}
 
-    async findAllUsers(query: Query): Promise<Users[]>{
-        const filter = query.keyword ? {
-            title: {
-                $regex: query.keyword,
-                $options: 'i'
-            }
-        } : {}
-
-        const mongoQuery = this.model.find(filter);
-
-        if(query.page)
-        {
-            const countPerPage : number = 2;
-            const currentPage = Number (query.page) || 1;
-            const skip = countPerPage * currentPage - 1;
-            mongoQuery.limit(countPerPage).skip(skip);
+    async findAllUsers(query: Query){
+        const filter = query.keyword
+        ? {
+            name: {
+            $regex: query.keyword,
+            $options: 'i',
+            },
         }
-        return await mongoQuery.exec();
+        : {};
+
+        let limit;
+        let skip;
+
+        if (query.page && query.limit) {
+            const page = Number(query.page);
+            limit = Number(query.limit);
+            skip = (page - 1) * limit;
+        }
+        else{
+            const cacheKey = 'users:all';
+            const cached = await this.redisClient.get(cacheKey);
+            if (cached) {
+                console.log('users cache hit');
+                return cached;
+            }
+        }
+
+
+        return this.usersRepo.findAll(filter, limit, skip);
     }
 
-    async findUserById(id: string): Promise<Users>{
+    async findUserById(id: string) {
         const isValid = mongoose.isValidObjectId(id);
         if(!isValid)
         {
             throw new BadRequestException('Not a valid ID');
         }
         const cacheKey = `user:${id}`;
-        const cachedUser = await this.redisClient.get<Users>(cacheKey);
+        const cachedUser = await this.redisClient.get<User>(cacheKey);
         if(cachedUser){ 
             console.log('cached order - findUserById');
             return cachedUser;
         };
-        const user = await this.model.findById(id);
+        const user = await this.usersRepo.findById(id);
         if(!user)
         {
             throw new NotFoundException('User not found');  
         }
-        await this.redisClient.set(cacheKey, JSON.stringify(user), 60);
+        await this.redisClient.set(cacheKey, user, 600);
         return user;
     }
 
-    async create(user: Users): Promise<Users>{
-        const result = await this.model.create(user);
+    async create(user: User) {
+       const result = await this.usersRepo.create(user);
+
         this.client.emit('user.created', {
-            id: result.id,
-            email: result.email
+        id: result.id,
+        email: result.email,
         });
+        await this.redisClient.del('users:all');
         return result;
     } 
 
-    async update(id: string, user: Users): Promise<Users>{
-        const isValid = mongoose.isValidObjectId(id);
-        if(!isValid)
-        {
-            throw new BadRequestException('Not a valid id');
+    async update(id: string, user: any) {
+        if (!mongoose.isValidObjectId(id)) {
+        throw new BadRequestException('Not a valid id');
         }
-        const res =  await this.model.findByIdAndUpdate(id, user, 
-        {
-            new: true,
-            runValidators: true
-        });
-        if(!res)
-        {
+
+        const res = await this.usersRepo.update(id, user);
+        const cacheKey = `user:${id}`;
+        if (!res) {
             throw new NotFoundException('User not found');
         }
+        await this.redisClient.del(cacheKey);
+        await this.redisClient.del('users:all');
+
+        await this.redisClient.set(cacheKey, user, 600)
+        
         this.client.emit('user.updated', {
-            id: res.id
+        id: res.id,
         });
+
         return res;
     }
-    
-    async delete(id: string): Promise<Users>{
-        const isValid = mongoose.isValidObjectId(id);
-        if(!isValid)
-        {
+
+    async delete(id: string) {
+        if (!mongoose.isValidObjectId(id)) {
             throw new BadRequestException('Not a valid id');
         }
-        const res = await this.model.findByIdAndDelete(id);
-        if(!res)
-        {
-            throw new NotFoundException('User not found');
+
+        const res = await this.usersRepo.delete(id);
+
+        if (!res) {
+        throw new NotFoundException('User not found');
         }
+
+        await this.redisClient.del(`user:${id}`);
+        await this.redisClient.del('users:all');
+
         this.client.emit('user.deleted', {
-            id: res.id
+        id: res.id,
         });
+
         return res;
-    }
+  }
 }
