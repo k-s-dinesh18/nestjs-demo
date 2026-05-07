@@ -7,8 +7,8 @@ export class AnalyticsServiceController {
   constructor(private readonly analyticsService: AnalyticsServiceService) {}
 
   @EventPattern('order.created')
-  handleOrderCreated(@Payload() message: any){
-    const order = message.value;
-    this.analyticsService.handleOrderCreated(order);
+  handleOrderCreated(@Payload() data: any) {
+    console.log('[Log] event received');
+    this.analyticsService.handleOrderCreated(data);
   }
 }

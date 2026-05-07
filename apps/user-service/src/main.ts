@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { Transport } from '@nestjs/microservices';
-import { UserServiceModule } from './user-service.module';
+import { UserServiceModule } from './users.service.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(UserServiceModule);

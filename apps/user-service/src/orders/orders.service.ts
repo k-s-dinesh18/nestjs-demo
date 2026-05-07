@@ -24,8 +24,11 @@ export class OrdersService {
         await this.redisService.set(`order:${order.id}`, order, 60);
         await this.redisService.del('orders:all');
         
-        this.kafkaClient.emit('order.created', order);
-
+       this.kafkaClient.emit('order.created', {
+            id: order.id,
+            amount: Number(order.amount)
+        });
+        console.log('[kafka] message sent to kafka');
         return order;
     }
 

@@ -8,10 +8,12 @@ async function bootstrap() {
       options:{
         client:{
           clientId: 'analytics-service',
-          brokers: [process.env.KAFKA_BROKER ?? ''],
+          brokers: [process.env.KAFKA_BROKER ?? 'localhost:9092'],
         },
         consumer: {
           groupId: 'analytics-consumer-group',
+          sessionTimeout: 10000,        // default ~30s
+          heartbeatInterval: 3000,
         },
       }
   });

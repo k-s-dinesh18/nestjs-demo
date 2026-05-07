@@ -29,23 +29,28 @@ export class UsersService {
 
         let limit;
         let skip;
-
+        let isCacheable = false;
+        const cacheKey = 'users:all';
         if (query.page && query.limit) {
             const page = Number(query.page);
             limit = Number(query.limit);
             skip = (page - 1) * limit;
         }
         else{
-            const cacheKey = 'users:all';
-            const cached = await this.redisClient.get(cacheKey);
+            isCacheable = true;
+            const cached = await this.redisClient.get<User[]>(cacheKey);
             if (cached) {
-                console.log('users cache hit');
+                console.log('users cache hit - get all users');
                 return cached;
             }
         }
 
 
-        return this.usersRepo.findAll(filter, limit, skip);
+        const users = await this.usersRepo.findAll(filter, limit, skip);
+        if (isCacheable) {
+            await this.redisClient.set(cacheKey, users, 600);
+        }
+        return users;
     }
 
     async findUserById(id: string) {
